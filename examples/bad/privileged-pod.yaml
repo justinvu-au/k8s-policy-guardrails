@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-privileged-pod
+  namespace: default
+  labels:
+    app: bad-example
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      resources:
+        limits:
+          cpu: "200m"
+          memory: "256Mi"
+      securityContext:
+        privileged: true
