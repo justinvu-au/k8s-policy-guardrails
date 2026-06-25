@@ -22,9 +22,10 @@ jobs:
 
       - name: Install gator
         run: |
-            curl -L -o gator https://github.com/open-policy-agent/gatekeeper/releases/download/v3.16.0/gator-linux-amd64
-            chmod +x gator
-            sudo mv gator /usr/local/bin/
+          curl -L -o gator.tar.gz https://github.com/open-policy-agent/gatekeeper/releases/download/v3.22.2/gator-v3.22.2-darwin-amd64.tar.gz
+          tar -xzf gator.tar.gz
+          chmod +x gator
+          sudo mv gator /usr/local/bin/
 
       - name: Run policy tests
         run: gator test -f policies/ -f examples/
