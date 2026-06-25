@@ -27,8 +27,17 @@ jobs:
           chmod +x gator
           sudo mv gator /usr/local/bin/
 
-      - name: Run policy tests
-        run: gator test -f policies/ -f examples/
+      - name: Confirm compliant example passes cleanly
+        run: gator test -f policies/ -f examples/good/
+
+      - name: Confirm non-compliant examples are correctly blocked
+        run: |
+          if gator test -f policies/ -f examples/bad/; then
+            echo "ERROR: bad examples should have violated policy but were not flagged!"
+            exit 1
+          else
+            echo "All bad examples correctly flagged as violations — as expected."
+          fi
 
   # ── CD: only on push to main, only after test passes, gated by approval ──
   apply:
