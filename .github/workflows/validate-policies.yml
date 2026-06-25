@@ -1,0 +1,75 @@
+name: Validate and Apply Policies
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  RESOURCE_GROUP: pl-stats-rg
+  AKS_CLUSTER_NAME: plstats-aks
+
+jobs:
+
+  # ── CI: always runs, on every push and PR ──────────────────────
+  test:
+    name: Validate policies (gator test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install gator
+        run: |
+          curl -L -o gator.tar.gz https://github.com/open-policy-agent/gatekeeper/releases/latest/download/gator-v3.16.0-linux-amd64.tar.gz
+          tar -xzf gator.tar.gz
+          chmod +x gator
+          sudo mv gator /usr/local/bin/
+
+      - name: Run policy tests
+        run: gator test -f policies/ -f examples/
+
+  # ── CD: only on push to main, only after test passes, gated by approval ──
+  apply:
+    name: Apply policies to AKS
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.AKS_CLUSTER_NAME }}
+
+      - name: Apply ConstraintTemplates first
+        run: |
+          for f in policies/*.yaml; do
+            kubectl apply -f "$f"
+          done
+
+      - name: Wait for CRDs to register
+        run: sleep 10
+
+      - name: Re-apply to ensure Constraints attach (templates may lag on first pass)
+        run: |
+          for f in policies/*.yaml; do
+            kubectl apply -f "$f"
+          done
+
+      - name: Verify applied state
+        run: |
+          echo "--- ConstraintTemplates ---"
+          kubectl get constrainttemplates
+          echo "--- Constraints ---"
+          kubectl get constraints
